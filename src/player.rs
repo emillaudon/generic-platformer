@@ -15,6 +15,12 @@ pub struct EncounterTracker {
     timer: Timer,
 }
 
+#[derive(Component, Default, Reflect)]
+#[reflect(Component)]
+pub struct AttackTimer {
+    timer: Timer,
+}
+
 #[derive(Component, Inspectable)]
 pub struct Player {
     speed: f32,
@@ -38,6 +44,7 @@ pub enum PlayerAction {
     RunningLeft,
     Idle,
     Jumping,
+    Attacking,
 }
 
 #[derive(Component, Default)]
@@ -45,6 +52,7 @@ pub struct Animations {
     running: Handle<SpriteSheetAnimation>,
     idle: Handle<SpriteSheetAnimation>,
     jumping: Handle<SpriteSheetAnimation>,
+    attacking: Handle<SpriteSheetAnimation>,
 }
 
 
@@ -67,6 +75,7 @@ impl Plugin for PlayerPlugin {
                 .with_system(player_encounter_checking)
                 .with_system(camera_follow)
                 .with_system(change_animation)
+                .with_system(melee_attack)
     )
     .add_startup_system(load_sheet);
     }
@@ -110,7 +119,7 @@ fn player_movement(
                 vel.linvel = Vec2::new(-movement, vel.linvel.y);
                 player.facing_right = false;
                 transform.rotation = Quat::from_rotation_y(3.0);
-                if !player.jumping {
+                if !player.jumping && player.player_action != PlayerAction::Attacking {
                     player.player_action = PlayerAction::RunningLeft;
                 }
             }
@@ -119,7 +128,7 @@ fn player_movement(
             for mut vel in velocities.iter_mut() {
                 vel.linvel = Vec2::new(movement, vel.linvel.y);
                 player.facing_right = true;
-                if !player.jumping {
+                if !player.jumping && player.player_action != PlayerAction::Attacking {
                     player.player_action = PlayerAction::RunningRight;
                 }
             }
@@ -129,7 +138,7 @@ fn player_movement(
             if player.facing_right == false {
                 transform.rotation = Quat::from_rotation_y(3.0);
             }
-            if !player.jumping {
+            if !player.jumping && player.player_action != PlayerAction::Attacking {
                 player.player_action = PlayerAction::Idle;
             }
         }
@@ -180,6 +189,44 @@ fn cancel_jump(
 
 }
 
+//Melee
+fn melee_attack(
+    time: Res<Time>,
+    mut attack_timer_query: Query<&mut AttackTimer>,
+    mut player_transform_query: Query<&mut Transform, With<Player>>,
+    mut player_query: Query<&mut Player>,
+    mut commands: Commands,
+    buttons: Res<Input<MouseButton>>,
+) {
+    let mut player = player_query.single_mut();
+    let player_facing_right = player.facing_right;
+    let mut attack_timer = attack_timer_query.single_mut();
+    
+    let player_action = player.player_action;
+
+    if player_facing_right {
+
+    }
+
+    let mut player_transform = player_transform_query.single_mut();
+
+    if player_action == PlayerAction::Attacking {
+
+        attack_timer.timer.tick(time.delta());
+        println!("Ticks");
+
+        if attack_timer.timer.just_finished() {
+            println!("Done");
+            player.player_action = PlayerAction::Idle;
+        }
+    } else if buttons.just_pressed(MouseButton::Left) {
+        if player_action != PlayerAction::Attacking {
+            player.player_action = PlayerAction::Attacking;
+            attack_timer.timer.reset();
+        } 
+    }  
+}
+
 //Bullets and bullet movement
 fn shooting(
     mut player_transform_query: Query<&mut Transform, With<Player>>,
@@ -198,7 +245,7 @@ fn shooting(
 
     let mut player_transform = player_transform_query.single_mut();
 
-    if buttons.just_pressed(MouseButton::Left) {
+    if buttons.just_pressed(MouseButton::Right) {
         println!("Fired");
         commands.spawn_bundle(
             SpriteBundle {
@@ -269,7 +316,7 @@ fn load_sheet(
             image,
             Vec2::splat(32.0),
             2,
-            3,
+            5,
             Vec2::splat(0.1)
         );
 
@@ -300,17 +347,9 @@ fn change_animation(
         PlayerAction::RunningLeft => *animation = animations.running.clone(),
         PlayerAction::Jumping => *animation = animations.jumping.clone(),
         PlayerAction::Idle => *animation = animations.idle.clone(),
+        PlayerAction::Attacking => *animation = animations.attacking.clone(),
 
         _ => *animation = animations.idle.clone()
-    }
-
-    match player_action {
-        PlayerAction::RunningRight => println!("1"),
-        PlayerAction::RunningLeft => println!("2"),
-        PlayerAction::Jumping => println!("3"),
-        PlayerAction::Idle =>println!("4"),
-
-        _ => println!("5"),
     }
 
     if player_action == PlayerAction::RunningRight {
@@ -342,15 +381,27 @@ fn spawn_player(mut handles: ResMut<Animations>, mut commands: Commands, player_
             Duration::from_millis(100),
         ));
 
+    let attacking = animations.add(
+        SpriteSheetAnimation::from_range(
+            5..=8,
+            Duration::from_millis(50),
+        ));
+
     let animations_handler = Animations {
         running: running.clone(),
         idle: idle.clone(),
         jumping: jumping.clone(),
+        attacking: attacking.clone()
     };
 
     handles.idle = idle.clone();
     handles.running = running.clone();
     handles.jumping = jumping.clone();
+    handles.attacking = attacking.clone();
+
+    let attack_timer = AttackTimer {
+        timer: Timer::from_seconds(0.150, false)
+    };
     
     commands.spawn_bundle(
         SpriteSheetBundle {
@@ -373,6 +424,7 @@ fn spawn_player(mut handles: ResMut<Animations>, mut commands: Commands, player_
             facing_right: true,
             player_action: PlayerAction::Idle,
         })
+        .insert(attack_timer)
         .insert(EncounterTracker {
             timer: Timer::from_seconds(1.0, true)
         })
