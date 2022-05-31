@@ -205,10 +205,6 @@ fn melee_attack(
     
     let player_action = player.player_action;
 
-    if player_facing_right {
-
-    }
-
     let mut player_transform = player_transform_query.single_mut();
 
     if player_action == PlayerAction::Attacking {
