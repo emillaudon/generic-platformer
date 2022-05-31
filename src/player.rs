@@ -192,6 +192,7 @@ fn cancel_jump(
 //Melee
 fn melee_attack(
     time: Res<Time>,
+    mut velocities: Query<&mut Velocity, With<Player>>,
     mut attack_timer_query: Query<&mut AttackTimer>,
     mut player_transform_query: Query<&mut Transform, With<Player>>,
     mut player_query: Query<&mut Player>,
@@ -222,6 +223,16 @@ fn melee_attack(
     } else if buttons.just_pressed(MouseButton::Left) {
         if player_action != PlayerAction::Attacking {
             player.player_action = PlayerAction::Attacking;
+
+            let mut velocity = 2.0;
+            if !player_facing_right {
+                velocity = -velocity
+            }
+
+            for mut vel in velocities.iter_mut() {
+                vel.linvel = Vec2::new(velocity, 0.0);
+            }
+
             attack_timer.timer.reset();
         } 
     }  
