@@ -263,7 +263,7 @@ fn load_sheet(
     assets: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     animations: ResMut<Assets<SpriteSheetAnimation>>) {
-        let image = assets.load("characte2r.png");
+        let image = assets.load("character.png");
 
         let mut atlas = TextureAtlas::from_grid_with_padding(
             image,
